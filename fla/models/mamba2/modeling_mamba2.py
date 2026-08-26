@@ -1065,7 +1065,15 @@ class Mamba2ForCausalLM(Mamba2PreTrainedModel):
         if not fuse_linear_and_cross_entropy or labels is None:
             logits = self.lm_head(hidden_states if logits_to_keep is None else hidden_states[:, -logits_to_keep:])
         if labels is not None:
-            if getattr(self, 'criterion', None) is None:
+            # FLAME attaches a FusedLinearCrossEntropyLoss for the training
+            # path.  Evaluation materializes logits, so that criterion has the
+            # wrong signature: it expects hidden states plus the LM-head
+            # weight.  Select a logits-compatible criterion whenever the
+            # linear projection is not fused with cross entropy.
+            if (
+                getattr(self, 'criterion', None) is None
+                or not fuse_linear_and_cross_entropy
+            ):
                 if fuse_linear_and_cross_entropy:
                     criterion = FusedLinearCrossEntropyLoss()
                 elif self.config.fuse_cross_entropy:

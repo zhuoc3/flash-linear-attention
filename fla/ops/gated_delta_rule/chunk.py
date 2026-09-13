@@ -264,8 +264,10 @@ class ChunkGatedDeltaRuleFunction(torch.autograd.Function):
             chunk_size=ctx.chunk_size
         )
         if ctx.use_qk_l2norm_in_kernel:
-            dq = l2norm_bwd(q_orig, dq)
-            dk = l2norm_bwd(k_orig, dk)
+            # Match l2norm_fwd's epsilon. l2norm_bwd defaults to 1e-5,
+            # which differentiates a different function for small Q/K norms.
+            dq = l2norm_bwd(q_orig, dq, eps=1e-6)
+            dk = l2norm_bwd(k_orig, dk, eps=1e-6)
         return dq.to(q), dk.to(k), dv.to(v), dg.to(g), db.to(beta), None, dh0, None, None, None, None
 
 

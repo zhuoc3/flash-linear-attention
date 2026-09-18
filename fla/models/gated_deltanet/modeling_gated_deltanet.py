@@ -121,7 +121,18 @@ class GatedDeltaNetPreTrainedModel(PreTrainedModel):
         prenorm_residual_strategy: Optional[str] = 'rescale',
         num_residuals_per_layer: int = 2,
     ):
-        if isinstance(module, (nn.Linear, nn.Conv1d)):
+        if isinstance(module, GatedDeltaNet):
+            # Constructor values are discarded by meta -> to_empty training.
+            # Restore both recurrent parameters here, including on DTensors.
+            with torch.no_grad():
+                nn.init.uniform_(module.A_log, 0, 16)
+                module.A_log.clamp_(min=torch.finfo(torch.float32).tiny).log_()
+                nn.init.uniform_(module.dt_bias, math.log(0.001), math.log(0.1))
+                dt = module.dt_bias.exp().clamp_min(1e-4)
+                module.dt_bias.copy_(dt + torch.log(-torch.expm1(-dt)))
+            module.A_log._no_weight_decay = True
+            module.dt_bias._no_weight_decay = True
+        elif isinstance(module, (nn.Linear, nn.Conv1d)):
             # Slightly different from the TF version which uses truncated_normal for initialization
             # cf https://github.com/pytorch/pytorch/pull/5617
             nn.init.normal_(module.weight, mean=0.0, std=self.config.initializer_range)

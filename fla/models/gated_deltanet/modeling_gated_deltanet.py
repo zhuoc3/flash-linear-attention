@@ -128,7 +128,8 @@ class GatedDeltaNetPreTrainedModel(PreTrainedModel):
                 nn.init.uniform_(module.A_log, 0, 16)
                 module.A_log.clamp_(min=torch.finfo(torch.float32).tiny).log_()
                 nn.init.uniform_(module.dt_bias, math.log(0.001), math.log(0.1))
-                dt = module.dt_bias.exp().clamp_min(1e-4)
+                dt = module.dt_bias.exp()
+                dt.clamp_(min=1e-4)
                 module.dt_bias.copy_(dt + torch.log(-torch.expm1(-dt)))
             module.A_log._no_weight_decay = True
             module.dt_bias._no_weight_decay = True
